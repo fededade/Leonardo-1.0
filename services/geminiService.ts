@@ -2,8 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { ChatMessage } from "../types";
 
 // Initialize the Gemini API
-// IMPORTANTE: Imposta VITE_GEMINI_API_KEY nelle variabili d'ambiente di Vercel
-// Ottieni la chiave da: https://aistudio.google.com/app/apikey
+// La chiave viene letta dalle variabili d'ambiente di Vercel
+// Configura VITE_GEMINI_API_KEY su Vercel → Settings → Environment Variables
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 let genAI: GoogleGenAI | null = null;
@@ -73,9 +73,9 @@ Linee guida:
       parts: currentParts
     });
 
-    const model = genAI.models.get("gemini-2.0-flash");
-    
-    const response = await model.generateContent({
+    // Correct API call syntax for @google/genai
+    const response = await genAI.models.generateContent({
+      model: "gemini-2.0-flash",
       contents: contents
     });
 
@@ -91,11 +91,11 @@ Linee guida:
     if (error.message?.includes("quota") || error.message?.includes("429")) {
       return "⚠️ Limite di richieste raggiunto. Riprova tra qualche minuto.";
     }
-    
+
     if (error.message?.includes("SAFETY")) {
       return "⚠️ La richiesta non può essere elaborata per motivi di sicurezza. Prova a riformulare la domanda.";
     }
-    
+
     return `❌ Si è verificato un errore: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`;
   }
 };
