@@ -44,6 +44,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [selectedDateModal, setSelectedDateModal] = useState<string | null>(null);
   const [glowingUsers, setGlowingUsers] = useState<Set<string>>(new Set());
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   const isClassView = selectedStudentId === 'ALL';
   const selectedStudent = (students || []).find(s => s.id === selectedStudentId);
@@ -165,6 +167,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     return UserRole.TEACHER;
   };
 
+  const handleReplyToFeedback = async (originalFeedback: TeacherFeedback) => {
+    if (!replyText.trim()) return;
+    
+    // Create a reply as a public feedback
+    const replyContent = `↩️ In risposta a ${getSenderName(originalFeedback)}:\n"${originalFeedback.content.substring(0, 50)}${originalFeedback.content.length > 50 ? '...' : ''}"\n\n${replyText}`;
+    
+    await onAddFeedback('all', replyContent, '', true);
+    
+    setReplyText('');
+    setReplyingToId(null);
+  };
+
   const postItColors = [
     'from-yellow-400 to-amber-400',
     'from-pink-400 to-rose-400',
@@ -276,7 +290,46 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </a>
                       )}
                       
-                      <div className="flex justify-between items-center text-xs text-slate-700/80 pt-2 border-t border-black/10">
+                      {/* Reply Section */}
+                      {replyingToId === fb.id ? (
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Scrivi la tua risposta..."
+                            className="w-full p-2 text-xs bg-white/50 border border-black/10 rounded-lg text-slate-800 placeholder-slate-500 focus:outline-none focus:border-black/30 resize-none"
+                            rows={2}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleReplyToFeedback(fb)}
+                              disabled={!replyText.trim()}
+                              className="flex-1 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white py-1.5 px-3 rounded-lg transition-all"
+                            >
+                              ✉️ Invia
+                            </button>
+                            <button
+                              onClick={() => { setReplyingToId(null); setReplyText(''); }}
+                              className="text-xs bg-white/50 hover:bg-white/70 text-slate-700 py-1.5 px-3 rounded-lg transition-all"
+                            >
+                              ❌
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setReplyingToId(fb.id)}
+                          className="mt-2 w-full text-xs bg-white/30 hover:bg-white/50 text-slate-700 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                          </svg>
+                          Rispondi
+                        </button>
+                      )}
+                      
+                      <div className="flex justify-between items-center text-xs text-slate-700/80 pt-2 mt-2 border-t border-black/10">
                         <span className="font-bold">
                           {getSenderRole(fb) === UserRole.STUDENT ? '👨‍🎓' : '👨‍🏫'} {getSenderName(fb)}
                         </span>
@@ -295,11 +348,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       <header className="relative z-20 bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4 sticky top-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-white">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="Leonardo 1.0" className="w-10 h-10 rounded-xl shadow-lg object-contain" />
             <div className="flex items-center gap-3">
               <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-11 h-11 rounded-xl object-cover ring-2 ring-white/20" />
               <div>
