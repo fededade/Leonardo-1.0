@@ -104,9 +104,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           
           <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl border border-white/50 shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="relative px-8 pt-8 pb-4 text-center">
-              {/* Logo Image - Large */}
-              <div className="relative w-full h-48 mx-auto mb-4">
+            <div className="relative px-4 pt-6 pb-2 text-center">
+              {/* Logo Image - Extra Large */}
+              <div className="relative w-full h-64 mx-auto">
                 <img 
                   src="/logo.png" 
                   alt="Leonardo 1.0 Logo" 
