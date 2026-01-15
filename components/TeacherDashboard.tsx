@@ -26,7 +26,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   currentUser, students, teachers, allFiles, feedbacks, messages, onAddFeedback, onLogout, onAddStudent, onAddTeacher, onDeleteStudent,
   onSendMessage, onMarkMessageAsRead, unreadMessageCount, usersForMessaging, onUploadAttachment
 }) => {
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>('ALL');
   const [feedbackText, setFeedbackText] = useState('');
   const [gradeText, setGradeText] = useState('');
   const [isPublic, setIsPublic] = useState(false);
