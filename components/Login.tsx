@@ -104,22 +104,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           
           <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl border border-white/50 shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="relative px-8 pt-10 pb-8 text-center">
-              {/* Logo Image */}
-              <div className="relative w-40 h-40 mx-auto mb-6">
+            <div className="relative px-8 pt-8 pb-4 text-center">
+              {/* Logo Image - Large */}
+              <div className="relative w-full h-48 mx-auto mb-4">
                 <img 
                   src="/logo.png" 
                   alt="Leonardo 1.0 Logo" 
                   className="w-full h-full object-contain drop-shadow-2xl"
                 />
               </div>
-              
-              {/* Title with rainbow gradient */}
-              <h1 className="text-4xl font-extrabold mb-2">
-                <span className="bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 to-green-500 bg-clip-text text-transparent">Leonardo</span>
-                <span className="bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 bg-clip-text text-transparent"> 1.0</span>
-              </h1>
-              <p className="text-gray-500 text-sm font-medium italic">La piattaforma che cresce con te</p>
             </div>
 
             {/* Password Recovery Form */}
