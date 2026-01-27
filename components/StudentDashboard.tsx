@@ -55,6 +55,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
           to_email: 'davide.federico@effetre-properties.com',
           to_name: 'Prof. Federico Davide',
           student_name: user.name,
+          name: user.name,  // Alias for template compatibility
           subject: 'Accettazione Condizioni - Leonardo 1.0',
           message: `CONDIZIONI ACCETTATE
 
@@ -75,7 +76,7 @@ Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.
         };
 
         // @ts-ignore - emailjs is loaded globally
-        await window.emailjs.send('service_leonardo', 'template_disclaimer', templateParams);
+        await window.emailjs.send('service_eak01rs', 'template_disclaimer', templateParams);
         
         setDisclaimerAccepted(true);
         localStorage.setItem(`disclaimer_accepted_${user.id}`, 'true');
