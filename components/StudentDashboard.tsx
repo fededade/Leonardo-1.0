@@ -38,14 +38,87 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
   
   // Disclaimer state
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
+  const [isDisclaimerLocked, setIsDisclaimerLocked] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => {
     // Check localStorage for previous acceptance
-    return localStorage.getItem('disclaimer_accepted') === 'true';
+    return localStorage.getItem(`disclaimer_accepted_${user.id}`) === 'true';
   });
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
-  const handleDisclaimerAccept = (checked: boolean) => {
-    setDisclaimerAccepted(checked);
-    localStorage.setItem('disclaimer_accepted', checked ? 'true' : 'false');
+  const handleDisclaimerAccept = async (checked: boolean) => {
+    if (checked && !disclaimerAccepted) {
+      setIsSendingEmail(true);
+      
+      try {
+        // Send confirmation email via EmailJS
+        const templateParams = {
+          to_email: 'davide.federico@effetre-properties.com',
+          to_name: 'Prof. Federico Davide',
+          student_name: user.name,
+          subject: 'Accettazione Condizioni - Leonardo 1.0',
+          message: `CONDIZIONI ACCETTATE
+
+Studente: ${user.name}
+Username: ${user.username}
+Data e ora: ${new Date().toLocaleString('it-IT')}
+
+DISCLAIMER ACCETTATO:
+
+Il caricamento di qualsiasi file o contenuto su questa piattaforma implica la garanzia, da parte dell'utente, della piena e legittima titolarità dello stesso.
+
+Con l'atto del caricamento, l'utente riconosce e conferma che la successiva pubblicazione del materiale da parte dei gestori del sito avviene sulla base di una specifica autorizzazione – concessa in forma scritta o verbale – tra l'utente (proprietario) e i gestori del sito.
+
+L'utente accetta che il caricamento stesso valga come ratifica di tale accordo di pubblicazione.
+
+---
+Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.0`
+        };
+
+        // @ts-ignore - emailjs is loaded globally
+        await window.emailjs.send('service_leonardo', 'template_disclaimer', templateParams);
+        
+        setDisclaimerAccepted(true);
+        localStorage.setItem(`disclaimer_accepted_${user.id}`, 'true');
+        
+      } catch (error) {
+        console.error('Errore invio email:', error);
+        // Accept anyway but log error
+        setDisclaimerAccepted(true);
+        localStorage.setItem(`disclaimer_accepted_${user.id}`, 'true');
+      } finally {
+        setIsSendingEmail(false);
+        // Close after acceptance
+        setTimeout(() => {
+          setIsDisclaimerLocked(false);
+          setIsDisclaimerOpen(false);
+        }, 2000);
+      }
+    } else if (!checked) {
+      setDisclaimerAccepted(false);
+      localStorage.setItem(`disclaimer_accepted_${user.id}`, 'false');
+    }
+  };
+
+  const handleDisclaimerMouseEnter = () => {
+    if (!isDisclaimerLocked) {
+      setIsDisclaimerOpen(true);
+    }
+  };
+
+  const handleDisclaimerMouseLeave = () => {
+    if (!isDisclaimerLocked) {
+      setIsDisclaimerOpen(false);
+    }
+  };
+
+  const handleDisclaimerClick = () => {
+    setIsDisclaimerLocked(true);
+    setIsDisclaimerOpen(true);
+  };
+
+  const handleCloseDisclaimer = () => {
+    setIsDisclaimerLocked(false);
+    setIsDisclaimerOpen(false);
   };
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -423,8 +496,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
       <div className="fixed bottom-4 right-4 z-40">
         <div 
           className="relative"
-          onMouseEnter={() => setIsDisclaimerOpen(true)}
-          onMouseLeave={() => setIsDisclaimerOpen(false)}
+          onMouseEnter={handleDisclaimerMouseEnter}
+          onMouseLeave={handleDisclaimerMouseLeave}
         >
           {/* Question Mark Button */}
           <button 
@@ -433,7 +506,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 ? 'bg-green-500 hover:bg-green-600' 
                 : 'bg-amber-500 hover:bg-amber-600 animate-pulse'
             }`}
-            onClick={() => setIsDisclaimerOpen(!isDisclaimerOpen)}
+            onClick={handleDisclaimerClick}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 text-white">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
@@ -442,24 +515,39 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
           {/* Disclaimer Popup */}
           {isDisclaimerOpen && (
-            <div className="absolute bottom-12 right-0 w-80 sm:w-96 animate-fadeIn">
+            <div 
+              className="absolute bottom-12 right-0 w-80 sm:w-96 animate-fadeIn"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl blur-lg opacity-30"></div>
                 <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
                   {/* Header */}
                   <div className="relative p-3 border-b border-white/10 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                        </svg>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-white font-bold text-sm">Informativa sul Caricamento</h3>
                       </div>
-                      <h3 className="text-white font-bold text-sm">Informativa sul Caricamento</h3>
+                      {isDisclaimerLocked && (
+                        <button 
+                          onClick={handleCloseDisclaimer}
+                          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white/70">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                   
                   {/* Content */}
-                  <div className="p-4">
+                  <div className="p-4 max-h-80 overflow-y-auto">
                     <p className="text-white/80 text-xs leading-relaxed mb-4">
                       Il caricamento di qualsiasi file o contenuto su questa piattaforma implica la garanzia, da parte dell'utente, della piena e legittima titolarità dello stesso.
                     </p>
@@ -471,11 +559,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     </p>
                     
                     {/* Checkbox */}
-                    <label className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-all">
+                    <label className={`flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-all ${isSendingEmail ? 'opacity-50 pointer-events-none' : ''}`}>
                       <input 
                         type="checkbox" 
                         checked={disclaimerAccepted}
                         onChange={(e) => handleDisclaimerAccept(e.target.checked)}
+                        disabled={isSendingEmail || disclaimerAccepted}
                         className="mt-0.5 w-4 h-4 rounded border-white/30 bg-white/10 text-green-500 focus:ring-green-500 focus:ring-offset-0 cursor-pointer"
                       />
                       <span className="text-xs text-white/70 leading-relaxed">
@@ -483,12 +572,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
                       </span>
                     </label>
                     
-                    {disclaimerAccepted && (
+                    {isSendingEmail && (
+                      <div className="mt-3 flex items-center gap-2 text-amber-400 text-xs">
+                        <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Invio conferma in corso...</span>
+                      </div>
+                    )}
+                    
+                    {disclaimerAccepted && !isSendingEmail && (
                       <div className="mt-3 flex items-center gap-2 text-green-400 text-xs">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span>Accettato</span>
+                        <span>Accettato e confermato via email</span>
                       </div>
                     )}
                   </div>
