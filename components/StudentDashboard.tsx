@@ -56,6 +56,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
           to_name: 'Prof. Federico Davide',
           student_name: user.name,
           name: user.name,  // Alias for template compatibility
+          email: user.email || 'noreply@leonardo.edu',  // For Reply To field
           subject: 'Accettazione Condizioni - Leonardo 1.0',
           message: `CONDIZIONI ACCETTATE
 
@@ -75,14 +76,17 @@ L'utente accetta che il caricamento stesso valga come ratifica di tale accordo d
 Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.0`
         };
 
+        console.log('Invio email disclaimer...', templateParams);
+        
         // @ts-ignore - emailjs is loaded globally
-        await window.emailjs.send('service_eak01rs', 'template_disclaimer', templateParams);
+        const response = await window.emailjs.send('service_eak01rs', 'template_disclaimer', templateParams);
+        console.log('Email inviata con successo:', response);
         
         setDisclaimerAccepted(true);
         localStorage.setItem(`disclaimer_accepted_${user.id}`, 'true');
         
       } catch (error) {
-        console.error('Errore invio email:', error);
+        console.error('Errore invio email disclaimer:', error);
         // Accept anyway but log error
         setDisclaimerAccepted(true);
         localStorage.setItem(`disclaimer_accepted_${user.id}`, 'true');
