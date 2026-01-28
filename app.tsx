@@ -3,7 +3,8 @@ import Login from './components/Login';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import UploadProgressModal from './components/UploadProgressModal';
-import { User, UserRole, AppFile, TeacherFeedback, Message, UploadProgress } from './types';
+import ActivityModal from './components/ActivityModal';
+import { User, UserRole, AppFile, TeacherFeedback, Message, UploadProgress, Assignment, Submission, Grade } from './types';
 import { MOCK_USERS } from './constants';
 
 // Firebase Imports
@@ -56,6 +57,15 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // New state for assignments, submissions, grades
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+
+  // Activity modal state
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [lastLoginTime, setLastLoginTime] = useState<number>(0);
+
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
     isUploading: false,
     progress: 0,
@@ -94,17 +104,54 @@ const App: React.FC = () => {
       setMessages(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Message)));
     });
 
+    // New listeners for assignments, submissions, grades
+    const qAssignments = query(collection(db, 'assignments'), orderBy('createdAt', 'desc'));
+    const unsubscribeAssignments = onSnapshot(qAssignments, (snapshot: any) => {
+      setAssignments(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Assignment)));
+    });
+
+    const qSubmissions = query(collection(db, 'submissions'), orderBy('submittedAt', 'desc'));
+    const unsubscribeSubmissions = onSnapshot(qSubmissions, (snapshot: any) => {
+      setSubmissions(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Submission)));
+    });
+
+    const qGrades = query(collection(db, 'grades'), orderBy('timestamp', 'desc'));
+    const unsubscribeGrades = onSnapshot(qGrades, (snapshot: any) => {
+      setGrades(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Grade)));
+    });
+
     return () => {
       unsubscribeUsers();
       unsubscribeFiles();
       unsubscribeFeedbacks();
       unsubscribeMessages();
+      unsubscribeAssignments();
+      unsubscribeSubmissions();
+      unsubscribeGrades();
     };
   }, []);
 
-  const handleLogin = (loggedInUser: User) => setUser(loggedInUser);
+  const handleLogin = (loggedInUser: User) => {
+    // Get last login time from localStorage
+    const storedLastLogin = localStorage.getItem(`lastLogin_${loggedInUser.id}`);
+    const lastLogin = storedLastLogin ? parseInt(storedLastLogin) : 0;
+    setLastLoginTime(lastLogin);
+    
+    // Set user
+    setUser(loggedInUser);
+    
+    // Show activity modal after a short delay to allow data to load
+    setTimeout(() => {
+      setShowActivityModal(true);
+    }, 500);
+    
+    // Update last login time
+    localStorage.setItem(`lastLogin_${loggedInUser.id}`, Date.now().toString());
+  };
+
   const handleLogout = () => setUser(null);
   const handleCloseUploadModal = () => setUploadProgress({ isUploading: false, progress: 0, fileName: '', status: 'uploading' });
+  const handleCloseActivityModal = () => setShowActivityModal(false);
 
   const handleUpload = async (file: File) => {
     if (!user) return;
@@ -319,6 +366,117 @@ const App: React.FC = () => {
     }
   };
 
+  // ============================================
+  // NEW: Assignment handlers
+  // ============================================
+
+  const handleCreateAssignment = async (
+    title: string, 
+    description: string, 
+    type: 'collective' | 'single', 
+    dueDate?: number, 
+    subject?: string
+  ) => {
+    if (!user || user.role !== UserRole.TEACHER) return;
+    
+    try {
+      await addDoc(collection(db, 'assignments'), {
+        title,
+        description,
+        creatorId: user.id,
+        creatorName: user.name,
+        type,
+        dueDate: dueDate || null,
+        subject: subject || null,
+        createdAt: Date.now(),
+        status: 'active'
+      });
+      console.log('✅ Compito creato:', title);
+    } catch (error) {
+      console.error('❌ Errore creazione compito:', error);
+      alert('Errore durante la creazione del compito. Riprova.');
+    }
+  };
+
+  const handleSubmitAssignment = async (
+    assignmentId: string, 
+    assignmentTitle: string, 
+    file: File, 
+    notes?: string
+  ): Promise<boolean> => {
+    if (!user || user.role !== UserRole.STUDENT) return false;
+    
+    try {
+      // Upload file first
+      const storageRef = ref(storage, `submissions/${user.id}/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      return new Promise((resolve) => {
+        uploadTask.on('state_changed',
+          () => {},
+          (error) => {
+            console.error('Submission upload error:', error);
+            resolve(false);
+          },
+          async () => {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            
+            // Create submission record
+            await addDoc(collection(db, 'submissions'), {
+              assignmentId,
+              assignmentTitle,
+              studentId: user.id,
+              studentName: user.name,
+              fileUrl: downloadURL,
+              fileName: file.name,
+              submittedAt: Date.now(),
+              notes: notes || null
+            });
+            
+            console.log('✅ Elaborato consegnato per:', assignmentTitle);
+            resolve(true);
+          }
+        );
+      });
+    } catch (error) {
+      console.error('❌ Errore consegna elaborato:', error);
+      return false;
+    }
+  };
+
+  const handleAddGrade = async (
+    assignmentId: string, 
+    submissionId: string, 
+    studentId: string, 
+    studentName: string, 
+    value: number, 
+    comment?: string
+  ) => {
+    if (!user || user.role !== UserRole.TEACHER) return;
+    
+    try {
+      await addDoc(collection(db, 'grades'), {
+        assignmentId,
+        submissionId,
+        studentId,
+        studentName,
+        teacherId: user.id,
+        teacherName: user.name,
+        value,
+        comment: comment || null,
+        timestamp: Date.now()
+      });
+      console.log('✅ Voto assegnato a:', studentName);
+    } catch (error) {
+      console.error('❌ Errore assegnazione voto:', error);
+      alert('Errore durante l\'assegnazione del voto. Riprova.');
+    }
+  };
+
+  // ============================================
+  // Utility functions
+  // ============================================
+
   const getUnreadMessageCount = () => {
     if (!user) return 0;
     return messages.filter(m => m.recipientId === user.id && !m.read).length;
@@ -366,6 +524,9 @@ const App: React.FC = () => {
           allFiles={files}
           feedbacks={feedbacks}
           messages={messages}
+          assignments={assignments}
+          submissions={submissions}
+          grades={grades}
           onAddFeedback={handleAddFeedback}
           onLogout={handleLogout}
           onAddStudent={handleAddStudent}
@@ -376,8 +537,19 @@ const App: React.FC = () => {
           unreadMessageCount={getUnreadMessageCount()}
           usersForMessaging={getUsersForMessaging()}
           onUploadAttachment={handleUploadAttachment}
+          onCreateAssignment={handleCreateAssignment}
+          onAddGrade={handleAddGrade}
         />
         <UploadProgressModal uploadProgress={uploadProgress} onClose={handleCloseUploadModal} />
+        <ActivityModal
+          isOpen={showActivityModal}
+          onClose={handleCloseActivityModal}
+          currentUser={user}
+          messages={messages}
+          feedbacks={feedbacks}
+          assignments={assignments}
+          lastLoginTime={lastLoginTime}
+        />
       </>
     );
   }
@@ -389,6 +561,9 @@ const App: React.FC = () => {
         files={files.filter(f => f.ownerId === user.id)}
         feedbacks={feedbacks.filter(f => f.studentId === user.id || f.isPublic)}
         messages={messages}
+        assignments={assignments.filter(a => a.status === 'active')}
+        submissions={submissions.filter(s => s.studentId === user.id)}
+        grades={grades.filter(g => g.studentId === user.id)}
         onUpload={handleUpload}
         onSaveAiContent={handleSaveAiContent}
         onLogout={handleLogout}
@@ -399,8 +574,18 @@ const App: React.FC = () => {
         usersForMessaging={getUsersForMessaging()}
         teachers={teachers || []}
         onStudentPost={handleStudentPost}
+        onSubmitAssignment={handleSubmitAssignment}
       />
       <UploadProgressModal uploadProgress={uploadProgress} onClose={handleCloseUploadModal} />
+      <ActivityModal
+        isOpen={showActivityModal}
+        onClose={handleCloseActivityModal}
+        currentUser={user}
+        messages={messages}
+        feedbacks={feedbacks}
+        assignments={assignments}
+        lastLoginTime={lastLoginTime}
+      />
     </>
   );
 };
