@@ -79,7 +79,7 @@ Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.
         console.log('Invio email disclaimer...', templateParams);
         
         // @ts-ignore - emailjs is loaded globally
-        const response = await window.emailjs.send('service_eak01rs', 'template_disclaimer', templateParams);
+        const response = await window.emailjs.send('service_leonardo', 'template_disclaimer', templateParams);
         console.log('Email inviata con successo:', response);
         
         setDisclaimerAccepted(true);
