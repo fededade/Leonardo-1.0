@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, AppFile, TeacherFeedback, Message, UserRole } from '../types';
+import { User, AppFile, TeacherFeedback, Message, UserRole, Assignment, Submission, Grade } from '../types';
 import FileCard from './FileCard';
 import MessageCenter from './MessageCenter';
 
@@ -10,6 +10,9 @@ interface TeacherDashboardProps {
   allFiles: AppFile[];
   feedbacks: TeacherFeedback[];
   messages: Message[];
+  assignments: Assignment[];
+  submissions: Submission[];
+  grades: Grade[];
   onAddFeedback: (studentId: string, content: string, grade?: string, isPublic?: boolean, attachmentUrl?: string, attachmentName?: string) => void;
   onLogout: () => void;
   onAddStudent: (name: string, username: string, password?: string, email?: string) => void;
@@ -20,11 +23,15 @@ interface TeacherDashboardProps {
   unreadMessageCount: number;
   usersForMessaging: User[];
   onUploadAttachment: (file: File) => Promise<{url: string, name: string} | null>;
+  onCreateAssignment: (title: string, description: string, type: 'collective' | 'single', dueDate?: number, subject?: string) => void;
+  onAddGrade: (assignmentId: string, submissionId: string, studentId: string, studentName: string, value: number, comment?: string) => void;
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
-  currentUser, students, teachers, allFiles, feedbacks, messages, onAddFeedback, onLogout, onAddStudent, onAddTeacher, onDeleteStudent,
-  onSendMessage, onMarkMessageAsRead, unreadMessageCount, usersForMessaging, onUploadAttachment
+  currentUser, students, teachers, allFiles, feedbacks, messages, assignments, submissions, grades,
+  onAddFeedback, onLogout, onAddStudent, onAddTeacher, onDeleteStudent,
+  onSendMessage, onMarkMessageAsRead, unreadMessageCount, usersForMessaging, onUploadAttachment,
+  onCreateAssignment, onAddGrade
 }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>('ALL');
   const [feedbackText, setFeedbackText] = useState('');
@@ -47,6 +54,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [previewFile, setPreviewFile] = useState<AppFile | null>(null);
+  
+  // Assignment modal state
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [assignmentDescription, setAssignmentDescription] = useState('');
+  const [assignmentType, setAssignmentType] = useState<'collective' | 'single'>('single');
+  const [assignmentDueDate, setAssignmentDueDate] = useState('');
+  const [assignmentSubject, setAssignmentSubject] = useState('');
+  
+  // Grades table state
+  const [isGradesTableOpen, setIsGradesTableOpen] = useState(false);
 
   const isClassView = selectedStudentId === 'ALL';
   const selectedStudent = (students || []).find(s => s.id === selectedStudentId);
@@ -477,6 +495,303 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
       )}
 
+      {/* Create Assignment Modal */}
+      {isAssignmentModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="relative w-full max-w-lg">
+            <div className="absolute -inset-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur-lg opacity-30"></div>
+            <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+              <div className="relative p-4 border-b border-white/10">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-600/10 to-emerald-600/10"></div>
+                <div className="relative flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                    </div>
+                    <h3 className="text-white font-bold">Crea Nuovo Compito</h3>
+                  </div>
+                  <button onClick={() => setIsAssignmentModalOpen(false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white/70">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* Tipo Compito */}
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase mb-2">Tipo di Compito *</label>
+                  <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
+                    <button 
+                      type="button" 
+                      onClick={() => setAssignmentType('single')} 
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${assignmentType === 'single' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' : 'text-white/60 hover:text-white'}`}
+                    >
+                      👤 Singolo
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setAssignmentType('collective')} 
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${assignmentType === 'collective' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' : 'text-white/60 hover:text-white'}`}
+                    >
+                      👥 Collettivo
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/40 mt-2">
+                    {assignmentType === 'single' 
+                      ? '📌 Solo tu potrai valutare gli elaborati' 
+                      : '📌 Tutti i docenti potranno valutare, verrà calcolata la media'}
+                  </p>
+                </div>
+
+                {/* Titolo */}
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase mb-2">Titolo *</label>
+                  <input 
+                    type="text" 
+                    value={assignmentTitle}
+                    onChange={(e) => setAssignmentTitle(e.target.value)}
+                    className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/50" 
+                    placeholder="Es. Analisi del testo - Canto I Inferno" 
+                  />
+                </div>
+
+                {/* Descrizione */}
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase mb-2">Descrizione / Consegna *</label>
+                  <textarea 
+                    value={assignmentDescription}
+                    onChange={(e) => setAssignmentDescription(e.target.value)}
+                    className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/50 resize-none h-28" 
+                    placeholder="Descrivi il compito, le istruzioni e i criteri di valutazione..." 
+                  />
+                </div>
+
+                {/* Materia (Opzionale) */}
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase mb-2">Materia (Opzionale)</label>
+                  <input 
+                    type="text" 
+                    value={assignmentSubject}
+                    onChange={(e) => setAssignmentSubject(e.target.value)}
+                    className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/50" 
+                    placeholder="Es. Italiano, Matematica, Storia..." 
+                  />
+                </div>
+
+                {/* Data Consegna (Opzionale) */}
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase mb-2">Data di Consegna (Opzionale)</label>
+                  <input 
+                    type="date" 
+                    value={assignmentDueDate}
+                    onChange={(e) => setAssignmentDueDate(e.target.value)}
+                    className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/50" 
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <button 
+                  onClick={() => {
+                    if (assignmentTitle && assignmentDescription) {
+                      const dueDate = assignmentDueDate ? new Date(assignmentDueDate).getTime() : undefined;
+                      onCreateAssignment(
+                        assignmentTitle, 
+                        assignmentDescription, 
+                        assignmentType, 
+                        dueDate, 
+                        assignmentSubject || undefined
+                      );
+                      // Reset form
+                      setAssignmentTitle('');
+                      setAssignmentDescription('');
+                      setAssignmentType('single');
+                      setAssignmentDueDate('');
+                      setAssignmentSubject('');
+                      setIsAssignmentModalOpen(false);
+                    }
+                  }}
+                  disabled={!assignmentTitle || !assignmentDescription}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-all"
+                >
+                  ✅ Pubblica Compito
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grades Table Modal */}
+      {isGradesTableOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="relative w-full max-w-5xl max-h-[90vh]">
+            <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl blur-lg opacity-30"></div>
+            <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="relative p-4 border-b border-white/10 shrink-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-orange-500/10"></div>
+                <div className="relative flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold">Tabella Voti</h3>
+                      <p className="text-white/50 text-xs">{(assignments || []).length} compiti • {(submissions || []).length} consegne</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsGradesTableOpen(false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white/70">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-4 overflow-auto flex-1">
+                {(assignments || []).length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/5 flex items-center justify-center text-4xl">📋</div>
+                    <p className="text-white/50">Nessun compito creato</p>
+                    <p className="text-white/30 text-sm mt-1">Crea il primo compito per iniziare</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {(assignments || []).map(assignment => {
+                      const assignmentSubmissions = (submissions || []).filter(s => s.assignmentId === assignment.id);
+                      const assignmentGrades = (grades || []).filter(g => g.assignmentId === assignment.id);
+                      
+                      return (
+                        <div key={assignment.id} className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+                          {/* Assignment Header */}
+                          <div className="p-4 border-b border-white/10 bg-white/5">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${assignment.type === 'collective' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                    {assignment.type === 'collective' ? '👥 Collettivo' : '👤 Singolo'}
+                                  </span>
+                                  {assignment.subject && (
+                                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-white/10 text-white/60">{assignment.subject}</span>
+                                  )}
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${assignment.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                    {assignment.status === 'active' ? '🟢 Attivo' : '⚪ Chiuso'}
+                                  </span>
+                                </div>
+                                <h4 className="text-white font-semibold">{assignment.title}</h4>
+                                <p className="text-white/50 text-xs mt-1">
+                                  Creato da {assignment.creatorName} • {new Date(assignment.createdAt).toLocaleDateString('it-IT')}
+                                  {assignment.dueDate && ` • Scadenza: ${new Date(assignment.dueDate).toLocaleDateString('it-IT')}`}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-white/70 text-sm">{assignmentSubmissions.length} consegne</p>
+                                <p className="text-white/40 text-xs">{assignmentGrades.length} valutazioni</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Submissions Table */}
+                          {assignmentSubmissions.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b border-white/10">
+                                    <th className="text-left text-xs font-bold text-white/50 uppercase p-3">Studente</th>
+                                    <th className="text-left text-xs font-bold text-white/50 uppercase p-3">File</th>
+                                    <th className="text-left text-xs font-bold text-white/50 uppercase p-3">Consegnato</th>
+                                    <th className="text-center text-xs font-bold text-white/50 uppercase p-3">
+                                      {assignment.type === 'collective' ? 'Voti / Media' : 'Voto'}
+                                    </th>
+                                    <th className="text-center text-xs font-bold text-white/50 uppercase p-3">Azioni</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {assignmentSubmissions.map(sub => {
+                                    const subGrades = assignmentGrades.filter(g => g.submissionId === sub.id);
+                                    const myGrade = subGrades.find(g => g.teacherId === currentUser.id);
+                                    const avgGrade = subGrades.length > 0 
+                                      ? (subGrades.reduce((sum, g) => sum + g.value, 0) / subGrades.length).toFixed(1)
+                                      : null;
+                                    
+                                    return (
+                                      <tr key={sub.id} className="border-b border-white/5 hover:bg-white/5">
+                                        <td className="p-3">
+                                          <p className="text-white text-sm font-medium">{sub.studentName}</p>
+                                        </td>
+                                        <td className="p-3">
+                                          <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                                            </svg>
+                                            {sub.fileName}
+                                          </a>
+                                        </td>
+                                        <td className="p-3">
+                                          <p className="text-white/60 text-sm">{new Date(sub.submittedAt).toLocaleDateString('it-IT')}</p>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                          {assignment.type === 'collective' ? (
+                                            <div>
+                                              {avgGrade ? (
+                                                <span className="text-lg font-bold text-amber-400">{avgGrade}</span>
+                                              ) : (
+                                                <span className="text-white/40 text-sm">-</span>
+                                              )}
+                                              <p className="text-white/40 text-xs">{subGrades.length} vot{subGrades.length === 1 ? 'o' : 'i'}</p>
+                                            </div>
+                                          ) : (
+                                            <span className={`text-lg font-bold ${myGrade ? 'text-amber-400' : 'text-white/40'}`}>
+                                              {myGrade ? myGrade.value : '-'}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                          {(assignment.type === 'collective' || assignment.creatorId === currentUser.id) && !myGrade && (
+                                            <button 
+                                              onClick={() => {
+                                                const voto = prompt(`Inserisci voto per ${sub.studentName} (1-10):`);
+                                                if (voto && !isNaN(parseFloat(voto))) {
+                                                  const value = Math.min(10, Math.max(1, parseFloat(voto)));
+                                                  onAddGrade(assignment.id, sub.id, sub.studentId, sub.studentName, value);
+                                                }
+                                              }}
+                                              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-lg text-white text-xs font-medium transition-all"
+                                            >
+                                              Valuta
+                                            </button>
+                                          )}
+                                          {myGrade && (
+                                            <span className="text-green-400 text-xs">✓ Valutato</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-6 text-center">
+                              <p className="text-white/40 text-sm">Nessuna consegna ricevuta</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Navbar */}
       <header className="relative z-20 bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4 sticky top-0">
         <div className="flex justify-between items-center">
@@ -492,6 +807,31 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Crea Compito Button */}
+            <button 
+              onClick={() => setIsAssignmentModalOpen(true)} 
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 transition-all group"
+              title="Crea nuovo compito"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              <span className="text-white text-sm font-medium hidden sm:inline">Compito</span>
+            </button>
+            
+            {/* Tabella Voti Button */}
+            <button 
+              onClick={() => setIsGradesTableOpen(true)} 
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 transition-all group"
+              title="Tabella voti"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5" />
+              </svg>
+              <span className="text-white text-sm font-medium hidden sm:inline">Voti</span>
+            </button>
+            
+            {/* Messages Button */}
             <button onClick={() => setIsMessageCenterOpen(true)} className="relative p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-white/70 group-hover:text-white">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
