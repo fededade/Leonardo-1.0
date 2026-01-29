@@ -108,6 +108,8 @@ export interface Submission {
   fileName: string;
   submittedAt: number;
   notes?: string;             // Note dello studente (opzionale)
+  targetTeacherId?: string;   // Docente a cui è indirizzato (per compiti collettivi)
+  targetTeacherName?: string;
 }
 
 // Voto assegnato da un docente

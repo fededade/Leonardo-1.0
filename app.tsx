@@ -402,7 +402,9 @@ const App: React.FC = () => {
     assignmentId: string, 
     assignmentTitle: string, 
     file: File, 
-    notes?: string
+    notes?: string,
+    targetTeacherId?: string,
+    targetTeacherName?: string
   ): Promise<boolean> => {
     if (!user || user.role !== UserRole.STUDENT) return false;
     
@@ -422,7 +424,7 @@ const App: React.FC = () => {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             
             // Create submission record
-            await addDoc(collection(db, 'submissions'), {
+            const submissionData: any = {
               assignmentId,
               assignmentTitle,
               studentId: user.id,
@@ -431,7 +433,15 @@ const App: React.FC = () => {
               fileName: file.name,
               submittedAt: Date.now(),
               notes: notes || null
-            });
+            };
+            
+            // Add target teacher for collective assignments
+            if (targetTeacherId) {
+              submissionData.targetTeacherId = targetTeacherId;
+              submissionData.targetTeacherName = targetTeacherName;
+            }
+            
+            await addDoc(collection(db, 'submissions'), submissionData);
             
             console.log('✅ Elaborato consegnato per:', assignmentTitle);
             resolve(true);
