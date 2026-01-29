@@ -22,7 +22,7 @@ interface StudentDashboardProps {
   usersForMessaging: User[];
   teachers: User[];
   onStudentPost: (content: string) => void;
-  onSubmitAssignment: (assignmentId: string, assignmentTitle: string, file: File, notes?: string) => Promise<boolean>;
+  onSubmitAssignment: (assignmentId: string, assignmentTitle: string, file: File, notes?: string, targetTeacherId?: string, targetTeacherName?: string) => Promise<boolean>;
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ 
@@ -49,6 +49,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [submissionNotes, setSubmissionNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   
   // Disclaimer state
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
@@ -157,19 +158,30 @@ Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.
   const handleSubmitAssignmentClick = async () => {
     if (!selectedAssignment || !submissionFile) return;
     
+    // For collective assignments, teacher selection is required
+    if (selectedAssignment.type === 'collective' && !selectedTeacherId) {
+      alert('⚠️ Seleziona un docente a cui indirizzare il compito');
+      return;
+    }
+    
+    const targetTeacher = teachers.find(t => t.id === selectedTeacherId);
+    
     setIsSubmitting(true);
     try {
       const success = await onSubmitAssignment(
         selectedAssignment.id,
         selectedAssignment.title,
         submissionFile,
-        submissionNotes || undefined
+        submissionNotes || undefined,
+        selectedAssignment.type === 'collective' ? selectedTeacherId : undefined,
+        selectedAssignment.type === 'collective' ? targetTeacher?.name : undefined
       );
       
       if (success) {
         setSelectedAssignment(null);
         setSubmissionFile(null);
         setSubmissionNotes('');
+        setSelectedTeacherId('');
         alert('✅ Elaborato consegnato con successo!');
       } else {
         alert('❌ Errore durante la consegna. Riprova.');
@@ -447,7 +459,7 @@ Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.
                       <p className="text-white/50 text-xs truncate max-w-[200px]">{selectedAssignment.title}</p>
                     </div>
                   </div>
-                  <button onClick={() => { setSelectedAssignment(null); setSubmissionFile(null); setSubmissionNotes(''); }} className="p-2 rounded-lg bg-white/5 hover:bg-white/10">
+                  <button onClick={() => { setSelectedAssignment(null); setSubmissionFile(null); setSubmissionNotes(''); setSelectedTeacherId(''); }} className="p-2 rounded-lg bg-white/5 hover:bg-white/10">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-white/70">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -495,6 +507,29 @@ Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.
                   </div>
                 </div>
 
+                {/* Teacher Selection for Collective Assignments */}
+                {selectedAssignment.type === 'collective' && (
+                  <div>
+                    <label className="block text-xs font-bold text-white/50 uppercase mb-2">Docente destinatario *</label>
+                    <select 
+                      value={selectedTeacherId}
+                      onChange={(e) => setSelectedTeacherId(e.target.value)}
+                      className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+                    >
+                      <option value="" className="bg-slate-800">Seleziona un docente...</option>
+                      {(teachers || []).map(teacher => (
+                        <option key={teacher.id} value={teacher.id} className="bg-slate-800">
+                          {teacher.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-white/40 text-xs mt-2">
+                      👥 Compito collettivo: tutti i docenti potranno valutare il tuo elaborato, ma verrà indirizzato al docente selezionato.
+                    </p>
+                  </div>
+                )}
+
                 {/* Notes */}
                 <div>
                   <label className="block text-xs font-bold text-white/50 uppercase mb-2">Note (Opzionale)</label>
@@ -509,7 +544,7 @@ Questo messaggio è stato generato automaticamente dalla piattaforma Leonardo 1.
                 {/* Submit Button */}
                 <button 
                   onClick={handleSubmitAssignmentClick}
-                  disabled={!submissionFile || isSubmitting}
+                  disabled={!submissionFile || isSubmitting || (selectedAssignment.type === 'collective' && !selectedTeacherId)}
                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (

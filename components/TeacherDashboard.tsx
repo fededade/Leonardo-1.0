@@ -704,6 +704,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                   <tr className="border-b border-white/10">
                                     <th className="text-left text-xs font-bold text-white/50 uppercase p-3">Studente</th>
                                     <th className="text-left text-xs font-bold text-white/50 uppercase p-3">File</th>
+                                    {assignment.type === 'collective' && (
+                                      <th className="text-left text-xs font-bold text-white/50 uppercase p-3">Destinatario</th>
+                                    )}
                                     <th className="text-left text-xs font-bold text-white/50 uppercase p-3">Consegnato</th>
                                     <th className="text-center text-xs font-bold text-white/50 uppercase p-3">
                                       {assignment.type === 'collective' ? 'Voti / Media' : 'Voto'}
@@ -732,6 +735,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                             {sub.fileName}
                                           </a>
                                         </td>
+                                        {assignment.type === 'collective' && (
+                                          <td className="p-3">
+                                            <p className={`text-sm ${(sub as any).targetTeacherId === currentUser.id ? 'text-green-400 font-medium' : 'text-white/60'}`}>
+                                              {(sub as any).targetTeacherName || 'Non specificato'}
+                                              {(sub as any).targetTeacherId === currentUser.id && ' 📌'}
+                                            </p>
+                                          </td>
+                                        )}
                                         <td className="p-3">
                                           <p className="text-white/60 text-sm">{new Date(sub.submittedAt).toLocaleDateString('it-IT')}</p>
                                         </td>
